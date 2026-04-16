@@ -32,5 +32,9 @@ func main() {
 }
 
 func processText(text string) string {
-	return text
+	words := strings.Fields(text)
+
+	words = handleHexBin(words)
+	return strings.Join(words, " ")
 }
+
