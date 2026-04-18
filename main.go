@@ -41,29 +41,84 @@ func processText(text string) string {
 
 		for i := 0; i < len(words); i++ {
 
+			// HEX
 			if words[i] == "(hex)" && i > 0 {
 				words[i-1] = hexToDecimal(words[i-1])
 				words[i] = ""
+				continue
 			}
 
+			// BIN
 			if words[i] == "(bin)" && i > 0 {
 				words[i-1] = binToDecimal(words[i-1])
 				words[i] = ""
+				continue
 			}
 
+			// (up, N)
+			if strings.HasPrefix(words[i], "(up,") && i+1 < len(words) {
+				numStr := strings.TrimSuffix(words[i+1], ")")
+				var n int
+				fmt.Sscanf(numStr, "%d", &n)
+
+				for j := 1; j <= n && i-j >= 0; j++ {
+					words[i-j] = strings.ToUpper(words[i-j])
+				}
+
+				words[i] = ""
+				words[i+1] = ""
+				continue
+			}
+
+			// (low, N)
+			if strings.HasPrefix(words[i], "(low,") && i+1 < len(words) {
+				numStr := strings.TrimSuffix(words[i+1], ")")
+				var n int
+				fmt.Sscanf(numStr, "%d", &n)
+
+				for j := 1; j <= n && i-j >= 0; j++ {
+					words[i-j] = strings.ToLower(words[i-j])
+				}
+
+				words[i] = ""
+				words[i+1] = ""
+				continue
+			}
+
+			// (cap, N)
+			if strings.HasPrefix(words[i], "(cap,") && i+1 < len(words) {
+				numStr := strings.TrimSuffix(words[i+1], ")")
+				var n int
+				fmt.Sscanf(numStr, "%d", &n)
+
+				for j := 1; j <= n && i-j >= 0; j++ {
+					words[i-j] = capitalize(words[i-j])
+				}
+
+				words[i] = ""
+				words[i+1] = ""
+				continue
+			}
+
+			// (up)
 			if words[i] == "(up)" && i > 0 {
 				words[i-1] = strings.ToUpper(words[i-1])
 				words[i] = ""
+				continue
 			}
 
+			// (low)
 			if words[i] == "(low)" && i > 0 {
 				words[i-1] = strings.ToLower(words[i-1])
 				words[i] = ""
+				continue
 			}
 
+			// (cap)
 			if words[i] == "(cap)" && i > 0 {
 				words[i-1] = capitalize(words[i-1])
 				words[i] = ""
+				continue
 			}
 		}
 

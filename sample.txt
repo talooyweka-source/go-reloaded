@@ -1,4 +1,3 @@
-hello (up)
-hello (low)
-1E (hex) and 10 (bin)
-welcome (cap)
+this is so exciting (up, 2)
+hello world (cap, 2)
+shouting too much (low, 3)
