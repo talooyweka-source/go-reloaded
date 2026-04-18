@@ -1,3 +1,4 @@
+
 package main
 
 import (
@@ -31,6 +32,8 @@ func main() {
 		return
 	}
 }
+
+// ================= PROCESS =================
 
 func processText(text string) string {
 	lines := strings.Split(text, "\n")
@@ -123,11 +126,13 @@ func processText(text string) string {
 		}
 
 		cleaned := strings.Join(clean(words), " ")
-		result = append(result, cleaned)
+		result = append(result, fixPunctuation(cleaned))
 	}
 
 	return strings.Join(result, "\n")
 }
+
+// ================= CONVERSIONS =================
 
 func hexToDecimal(s string) string {
 	var n int
@@ -148,6 +153,8 @@ func capitalize(word string) string {
 	return strings.ToUpper(string(word[0])) + strings.ToLower(word[1:])
 }
 
+// ================= CLEAN =================
+
 func clean(words []string) []string {
 	var res []string
 	for _, w := range words {
@@ -156,4 +163,54 @@ func clean(words []string) []string {
 		}
 	}
 	return res
+}
+
+// ================= PUNCTUATION =================
+
+func fixPunctuation(line string) string {
+	punct := ".,!?:;"
+
+	words := strings.Fields(line)
+	var res []string
+
+	for i := 0; i < len(words); i++ {
+		w := words[i]
+
+		// grouped punctuation
+		if w == "..." || w == "!?" {
+			res = append(res, w)
+			continue
+		}
+
+		// single punctuation token
+		if len(w) == 1 && strings.ContainsRune(punct, rune(w[0])) {
+			if len(res) > 0 {
+				res[len(res)-1] += w
+			} else {
+				res = append(res, w)
+			}
+			continue
+		}
+
+		// split trailing punctuation (hello,)
+		last := w[len(w)-1]
+		if strings.ContainsRune(punct, rune(last)) && len(w) > 1 {
+			res = append(res, w[:len(w)-1])
+			res = append(res, string(last))
+			continue
+		}
+
+		res = append(res, w)
+	}
+
+	var final []string
+	for i := 0; i < len(res); i++ {
+		if i > 0 && len(res[i]) == 1 && strings.ContainsRune(punct, rune(res[i][0])) {
+			final[len(final)-1] += res[i]
+		} else {
+			final = append(final, res[i])
+		}
+	}
+
+	return strings.Join(final, " ")
 }
