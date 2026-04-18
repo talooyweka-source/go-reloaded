@@ -31,24 +31,49 @@ func main() {
 		return
 	}
 }
+
 func processText(text string) string {
-	words := strings.Fields(text)
+	lines := strings.Split(text, "\n")
+	var result []string
 
-	for i := 0; i < len(words); i++ {
+	for _, line := range lines {
+		words := strings.Fields(line)
 
-		if words[i] == "(hex)" && i > 0 {
-			words[i-1] = hexToDecimal(words[i-1])
-			words[i] = ""
+		for i := 0; i < len(words); i++ {
+
+			if words[i] == "(hex)" && i > 0 {
+				words[i-1] = hexToDecimal(words[i-1])
+				words[i] = ""
+			}
+
+			if words[i] == "(bin)" && i > 0 {
+				words[i-1] = binToDecimal(words[i-1])
+				words[i] = ""
+			}
+
+			if words[i] == "(up)" && i > 0 {
+				words[i-1] = strings.ToUpper(words[i-1])
+				words[i] = ""
+			}
+
+			if words[i] == "(low)" && i > 0 {
+				words[i-1] = strings.ToLower(words[i-1])
+				words[i] = ""
+			}
+
+			if words[i] == "(cap)" && i > 0 {
+				words[i-1] = capitalize(words[i-1])
+				words[i] = ""
+			}
 		}
 
-		if words[i] == "(bin)" && i > 0 {
-			words[i-1] = binToDecimal(words[i-1])
-			words[i] = ""
-		}
+		cleaned := strings.Join(clean(words), " ")
+		result = append(result, cleaned)
 	}
 
-	return strings.Join(clean(words), " ")
+	return strings.Join(result, "\n")
 }
+
 func hexToDecimal(s string) string {
 	var n int
 	fmt.Sscanf(s, "%x", &n)
@@ -59,6 +84,13 @@ func binToDecimal(s string) string {
 	var n int
 	fmt.Sscanf(s, "%b", &n)
 	return fmt.Sprintf("%d", n)
+}
+
+func capitalize(word string) string {
+	if len(word) == 0 {
+		return word
+	}
+	return strings.ToUpper(string(word[0])) + strings.ToLower(word[1:])
 }
 
 func clean(words []string) []string {

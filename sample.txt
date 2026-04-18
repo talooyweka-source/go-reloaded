@@ -1,1 +1,4 @@
+hello (up)
+hello (low)
 1E (hex) and 10 (bin)
+welcome (cap)
