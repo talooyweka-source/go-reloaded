@@ -1,10 +1,10 @@
-
 package main
 
 import (
 	"fmt"
 	"os"
 	"strings"
+	"unicode"
 )
 
 func main() {
@@ -13,23 +13,17 @@ func main() {
 		return
 	}
 
-	inputFile := os.Args[1]
-	outputFile := os.Args[2]
-
-	data, err := os.ReadFile(inputFile)
+	data, err := os.ReadFile(os.Args[1])
 	if err != nil {
 		fmt.Println("Error reading file:", err)
 		return
 	}
 
-	text := string(data)
+	result := processText(string(data))
 
-	result := processText(text)
-
-	err = os.WriteFile(outputFile, []byte(result), 0644)
+	err = os.WriteFile(os.Args[2], []byte(result), 0644)
 	if err != nil {
 		fmt.Println("Error writing file:", err)
-		return
 	}
 }
 
@@ -37,7 +31,7 @@ func main() {
 
 func processText(text string) string {
 	lines := strings.Split(text, "\n")
-	var result []string
+	var out []string
 
 	for _, line := range lines {
 		words := strings.Fields(line)
@@ -48,88 +42,65 @@ func processText(text string) string {
 			if words[i] == "(hex)" && i > 0 {
 				words[i-1] = hexToDecimal(words[i-1])
 				words[i] = ""
-				continue
 			}
 
 			// BIN
 			if words[i] == "(bin)" && i > 0 {
 				words[i-1] = binToDecimal(words[i-1])
 				words[i] = ""
-				continue
 			}
 
-			// (up, N)
-			if strings.HasPrefix(words[i], "(up,") && i+1 < len(words) {
-				numStr := strings.TrimSuffix(words[i+1], ")")
+			// UP / LOW / CAP
+			if i > 0 {
+				switch words[i] {
+				case "(up)":
+					words[i-1] = strings.ToUpper(words[i-1])
+					words[i] = ""
+
+				case "(low)":
+					words[i-1] = strings.ToLower(words[i-1])
+					words[i] = ""
+
+				case "(cap)":
+					words[i-1] = capitalize(words[i-1])
+					words[i] = ""
+				}
+			}
+
+			// (up, N) / (low, N) / (cap, N)
+			if (strings.HasPrefix(words[i], "(up,") ||
+				strings.HasPrefix(words[i], "(low,") ||
+				strings.HasPrefix(words[i], "(cap,")) && i+1 < len(words) {
+
+				numStr := strings.Trim(words[i+1], ")")
 				var n int
 				fmt.Sscanf(numStr, "%d", &n)
 
 				for j := 1; j <= n && i-j >= 0; j++ {
-					words[i-j] = strings.ToUpper(words[i-j])
+					switch {
+					case strings.HasPrefix(words[i], "(up"):
+						words[i-j] = strings.ToUpper(words[i-j])
+					case strings.HasPrefix(words[i], "(low"):
+						words[i-j] = strings.ToLower(words[i-j])
+					case strings.HasPrefix(words[i], "(cap"):
+						words[i-j] = capitalize(words[i-j])
+					}
 				}
 
-				words[i] = ""
-				words[i+1] = ""
-				continue
-			}
-
-			// (low, N)
-			if strings.HasPrefix(words[i], "(low,") && i+1 < len(words) {
-				numStr := strings.TrimSuffix(words[i+1], ")")
-				var n int
-				fmt.Sscanf(numStr, "%d", &n)
-
-				for j := 1; j <= n && i-j >= 0; j++ {
-					words[i-j] = strings.ToLower(words[i-j])
-				}
-
-				words[i] = ""
-				words[i+1] = ""
-				continue
-			}
-
-			// (cap, N)
-			if strings.HasPrefix(words[i], "(cap,") && i+1 < len(words) {
-				numStr := strings.TrimSuffix(words[i+1], ")")
-				var n int
-				fmt.Sscanf(numStr, "%d", &n)
-
-				for j := 1; j <= n && i-j >= 0; j++ {
-					words[i-j] = capitalize(words[i-j])
-				}
-
-				words[i] = ""
-				words[i+1] = ""
-				continue
-			}
-
-			// (up)
-			if words[i] == "(up)" && i > 0 {
-				words[i-1] = strings.ToUpper(words[i-1])
-				words[i] = ""
-				continue
-			}
-
-			// (low)
-			if words[i] == "(low)" && i > 0 {
-				words[i-1] = strings.ToLower(words[i-1])
-				words[i] = ""
-				continue
-			}
-
-			// (cap)
-			if words[i] == "(cap)" && i > 0 {
-				words[i-1] = capitalize(words[i-1])
-				words[i] = ""
-				continue
+				words[i], words[i+1] = "", ""
 			}
 		}
 
-		cleaned := strings.Join(clean(words), " ")
-		result = append(result, fixPunctuation(cleaned))
+		line := strings.Join(clean(words), " ")
+
+		line = fixPunctuation(line)
+		line = fixQuotes(line)
+		line = fixArticles(line)
+
+		out = append(out, line)
 	}
 
-	return strings.Join(result, "\n")
+	return strings.Join(out, "\n")
 }
 
 // ================= CONVERSIONS =================
@@ -146,11 +117,11 @@ func binToDecimal(s string) string {
 	return fmt.Sprintf("%d", n)
 }
 
-func capitalize(word string) string {
-	if len(word) == 0 {
-		return word
+func capitalize(s string) string {
+	if len(s) == 0 {
+		return s
 	}
-	return strings.ToUpper(string(word[0])) + strings.ToLower(word[1:])
+	return strings.ToUpper(string(s[0])) + strings.ToLower(s[1:])
 }
 
 // ================= CLEAN =================
@@ -176,23 +147,18 @@ func fixPunctuation(line string) string {
 	for i := 0; i < len(words); i++ {
 		w := words[i]
 
-		// grouped punctuation
 		if w == "..." || w == "!?" {
 			res = append(res, w)
 			continue
 		}
 
-		// single punctuation token
 		if len(w) == 1 && strings.ContainsRune(punct, rune(w[0])) {
 			if len(res) > 0 {
 				res[len(res)-1] += w
-			} else {
-				res = append(res, w)
 			}
 			continue
 		}
 
-		// split trailing punctuation (hello,)
 		last := w[len(w)-1]
 		if strings.ContainsRune(punct, rune(last)) && len(w) > 1 {
 			res = append(res, w[:len(w)-1])
@@ -213,4 +179,49 @@ func fixPunctuation(line string) string {
 	}
 
 	return strings.Join(final, " ")
+}
+
+// ================= QUOTES =================
+
+func fixQuotes(s string) string {
+	var res []rune
+	in := false
+
+	for _, r := range s {
+		if r == '\'' {
+			if !in {
+				res = append(res, r)
+				in = true
+			} else {
+				res = append(res, r)
+				in = false
+			}
+			continue
+		}
+
+		if in && unicode.IsSpace(r) {
+			continue
+		}
+
+		res = append(res, r)
+	}
+
+	return string(res)
+}
+
+// ================= ARTICLE RULE =================
+
+func fixArticles(s string) string {
+	words := strings.Fields(s)
+
+	for i := 0; i < len(words)-1; i++ {
+		if words[i] == "a" {
+			next := strings.ToLower(words[i+1])
+			if len(next) > 0 && (strings.ContainsRune("aeiouh", rune(next[0]))) {
+				words[i] = "an"
+			}
+		}
+	}
+
+	return strings.Join(words, " ")
 }
