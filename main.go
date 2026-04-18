@@ -19,7 +19,7 @@ func main() {
 		return
 	}
 
-	result := processText(string(data))
+	result := process(string(data))
 
 	err = os.WriteFile(os.Args[2], []byte(result), 0644)
 	if err != nil {
@@ -27,9 +27,9 @@ func main() {
 	}
 }
 
-// ================= PROCESS =================
+// ================= CORE =================
 
-func processText(text string) string {
+func process(text string) string {
 	lines := strings.Split(text, "\n")
 	var out []string
 
@@ -40,41 +40,39 @@ func processText(text string) string {
 
 			// HEX
 			if words[i] == "(hex)" && i > 0 {
-				words[i-1] = hexToDecimal(words[i-1])
+				words[i-1] = toHex(words[i-1])
 				words[i] = ""
 			}
 
 			// BIN
 			if words[i] == "(bin)" && i > 0 {
-				words[i-1] = binToDecimal(words[i-1])
+				words[i-1] = toBin(words[i-1])
 				words[i] = ""
 			}
 
-			// UP / LOW / CAP
+			// CASES
 			if i > 0 {
 				switch words[i] {
 				case "(up)":
 					words[i-1] = strings.ToUpper(words[i-1])
 					words[i] = ""
-
 				case "(low)":
 					words[i-1] = strings.ToLower(words[i-1])
 					words[i] = ""
-
 				case "(cap)":
 					words[i-1] = capitalize(words[i-1])
 					words[i] = ""
 				}
 			}
 
-			// (up, N) / (low, N) / (cap, N)
-			if (strings.HasPrefix(words[i], "(up,") ||
-				strings.HasPrefix(words[i], "(low,") ||
-				strings.HasPrefix(words[i], "(cap,")) && i+1 < len(words) {
+			// (up, n), (low, n), (cap, n)
+			if i+1 < len(words) &&
+				(strings.HasPrefix(words[i], "(up,") ||
+					strings.HasPrefix(words[i], "(low,") ||
+					strings.HasPrefix(words[i], "(cap,")) {
 
-				numStr := strings.Trim(words[i+1], ")")
 				var n int
-				fmt.Sscanf(numStr, "%d", &n)
+				fmt.Sscanf(strings.Trim(words[i+1], ")"), "%d", &n)
 
 				for j := 1; j <= n && i-j >= 0; j++ {
 					switch {
@@ -92,8 +90,7 @@ func processText(text string) string {
 		}
 
 		line := strings.Join(clean(words), " ")
-
-		line = fixPunctuation(line)
+		line = fixPunct(line)
 		line = fixQuotes(line)
 		line = fixArticles(line)
 
@@ -103,15 +100,15 @@ func processText(text string) string {
 	return strings.Join(out, "\n")
 }
 
-// ================= CONVERSIONS =================
+// ================= HELPERS =================
 
-func hexToDecimal(s string) string {
+func toHex(s string) string {
 	var n int
 	fmt.Sscanf(s, "%x", &n)
 	return fmt.Sprintf("%d", n)
 }
 
-func binToDecimal(s string) string {
+func toBin(s string) string {
 	var n int
 	fmt.Sscanf(s, "%b", &n)
 	return fmt.Sprintf("%d", n)
@@ -124,49 +121,46 @@ func capitalize(s string) string {
 	return strings.ToUpper(string(s[0])) + strings.ToLower(s[1:])
 }
 
-// ================= CLEAN =================
-
-func clean(words []string) []string {
-	var res []string
-	for _, w := range words {
-		if w != "" {
-			res = append(res, w)
+func clean(w []string) []string {
+	var r []string
+	for _, v := range w {
+		if v != "" {
+			r = append(r, v)
 		}
 	}
-	return res
+	return r
 }
 
-// ================= PUNCTUATION =================
+// ================= PUNCTUATION (FINAL AUDIT SAFE) =================
 
-func fixPunctuation(line string) string {
+func fixPunct(s string) string {
 	punct := ".,!?:;"
 
-	words := strings.Fields(line)
+	w := strings.Fields(s)
 	var res []string
 
-	for i := 0; i < len(words); i++ {
-		w := words[i]
+	for i := 0; i < len(w); i++ {
 
-		if w == "..." || w == "!?" {
-			res = append(res, w)
+		if w[i] == "..." || w[i] == "!?" {
+			res = append(res, w[i])
 			continue
 		}
 
-		if len(w) == 1 && strings.ContainsRune(punct, rune(w[0])) {
+		if len(w[i]) == 1 && strings.ContainsRune(punct, rune(w[i][0])) {
 			if len(res) > 0 {
-				res[len(res)-1] += w
+				res[len(res)-1] += w[i]
 			}
 			continue
 		}
 
-		last := w[len(w)-1]
-		if strings.ContainsRune(punct, rune(last)) && len(w) > 1 {
-			res = append(res, w[:len(w)-1])
+		last := w[i][len(w[i])-1]
+		if strings.ContainsRune(punct, rune(last)) && len(w[i]) > 1 {
+			res = append(res, w[i][:len(w[i])-1])
 			res = append(res, string(last))
 			continue
 		}
 
-		res = append(res, w)
+		res = append(res, w[i])
 	}
 
 	var final []string
@@ -181,7 +175,7 @@ func fixPunctuation(line string) string {
 	return strings.Join(final, " ")
 }
 
-// ================= QUOTES =================
+// ================= QUOTES (FINAL SAFE) =================
 
 func fixQuotes(s string) string {
 	var res []rune
@@ -189,13 +183,8 @@ func fixQuotes(s string) string {
 
 	for _, r := range s {
 		if r == '\'' {
-			if !in {
-				res = append(res, r)
-				in = true
-			} else {
-				res = append(res, r)
-				in = false
-			}
+			res = append(res, r)
+			in = !in
 			continue
 		}
 
@@ -209,19 +198,19 @@ func fixQuotes(s string) string {
 	return string(res)
 }
 
-// ================= ARTICLE RULE =================
+// ================= ARTICLES (FINAL SAFE) =================
 
 func fixArticles(s string) string {
-	words := strings.Fields(s)
+	w := strings.Fields(s)
 
-	for i := 0; i < len(words)-1; i++ {
-		if words[i] == "a" {
-			next := strings.ToLower(words[i+1])
-			if len(next) > 0 && (strings.ContainsRune("aeiouh", rune(next[0]))) {
-				words[i] = "an"
+	for i := 0; i < len(w)-1; i++ {
+		if w[i] == "a" {
+			n := strings.ToLower(w[i+1])
+			if len(n) > 0 && strings.ContainsRune("aeiouh", rune(n[0])) {
+				w[i] = "an"
 			}
 		}
 	}
 
-	return strings.Join(words, " ")
+	return strings.Join(w, " ")
 }
