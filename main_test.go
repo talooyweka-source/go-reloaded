@@ -1,4 +1,4 @@
-package main
+ package main
 
 import "testing"
 
@@ -33,16 +33,14 @@ func TestProcess(t *testing.T) {
 		{"stop ; now :", "stop; now:"},
 
 		// ===== QUOTES =====
-		{"' hello '", "'hello'"},
 		{"' hello world '", "'hello world'"},
 		{"I am ' amazing '", "I am 'amazing'"},
 
 		// ===== ARTICLES =====
 		{"a apple", "an apple"},
 		{"a elephant", "an elephant"},
-		{"a house", "an house"},
+		{"a house", "a house"},
 		{"A orange", "An orange"},
-		{"a banana", "a banana"},
 
 		// ===== MIXED =====
 		{

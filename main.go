@@ -165,26 +165,53 @@ func fixPunct(s string) string {
 
 // ================= QUOTES =================
 
+
 func fixQuotes(s string) string {
 	var res []rune
 	in := false
+	start := -1
 
-	for _, r := range s {
-		if r == '\'' {
-			in = !in
-			res = append(res, r)
+	r := []rune(s)
+
+	for i := 0; i < len(r); i++ {
+
+		if r[i] == '\'' {
+			if !in {
+				// opening quote
+				in = true
+				start = len(res)
+				res = append(res, r[i])
+			} else {
+				// closing quote → clean inside
+				in = false
+
+				// trim spaces inside quotes
+				j := start + 1
+				k := len(res) - 1
+
+				for j < k && res[j] == ' ' {
+					j++
+				}
+				for k > start && res[k] == ' ' {
+					k--
+				}
+
+				// rebuild clean section
+				clean := []rune{'\''}
+				clean = append(clean, res[j:k+1]...)
+				clean = append(clean, '\'')
+
+				res = append(res[:start], clean...)
+			}
 			continue
 		}
 
-		if in && r == ' ' {
-			continue
-		}
-
-		res = append(res, r)
+		res = append(res, r[i])
 	}
 
 	return string(res)
 }
+
 
 // ================= ARTICLES =================
 
@@ -192,9 +219,13 @@ func fixArticles(s string) string {
 	w := strings.Fields(s)
 
 	for i := 0; i < len(w)-1; i++ {
+
 		if strings.ToLower(w[i]) == "a" {
+
 			next := strings.ToLower(w[i+1])
-			if len(next) > 0 && strings.ContainsRune("aeiouh", rune(next[0])) {
+			next = strings.Trim(next, ".,!?:;'\"")
+
+			if len(next) > 0 && isVowel(next[0]) {
 				if w[i] == "A" {
 					w[i] = "An"
 				} else {
@@ -205,4 +236,7 @@ func fixArticles(s string) string {
 	}
 
 	return strings.Join(w, " ")
+}
+func isVowel(c byte) bool {
+	return c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u'
 }
