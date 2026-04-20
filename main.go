@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
-	"unicode"
 )
 
 func main() {
@@ -34,19 +34,20 @@ func process(text string) string {
 	var out []string
 
 	for _, line := range lines {
+
 		words := strings.Fields(line)
 
 		for i := 0; i < len(words); i++ {
 
 			// HEX
 			if words[i] == "(hex)" && i > 0 {
-				words[i-1] = toHex(words[i-1])
+				words[i-1] = toBase(words[i-1], 16)
 				words[i] = ""
 			}
 
 			// BIN
 			if words[i] == "(bin)" && i > 0 {
-				words[i-1] = toBin(words[i-1])
+				words[i-1] = toBase(words[i-1], 2)
 				words[i] = ""
 			}
 
@@ -65,31 +66,33 @@ func process(text string) string {
 				}
 			}
 
-			// (up, n), (low, n), (cap, n)
-			if i+1 < len(words) &&
-				(strings.HasPrefix(words[i], "(up,") ||
-					strings.HasPrefix(words[i], "(low,") ||
-					strings.HasPrefix(words[i], "(cap,")) {
+			// (up, n) / (low, n) / (cap, n)
+			if strings.HasPrefix(words[i], "(") && i+1 < len(words) {
+				if strings.Contains(words[i], ",") {
 
-				var n int
-				fmt.Sscanf(strings.Trim(words[i+1], ")"), "%d", &n)
+					action := words[i]
+					numStr := strings.Trim(words[i+1], ")")
+					n, _ := strconv.Atoi(numStr)
 
-				for j := 0; j < n && i-1-j >= 0; j++ {
-					switch {
-					case strings.HasPrefix(words[i], "(up"):
-						words[i-1-j] = strings.ToUpper(words[i-1-j])
-					case strings.HasPrefix(words[i], "(low"):
-						words[i-1-j] = strings.ToLower(words[i-1-j])
-					case strings.HasPrefix(words[i], "(cap"):
-						words[i-1-j] = capitalize(words[i-1-j])
+					for j := 0; j < n && i-1-j >= 0; j++ {
+						switch {
+						case strings.HasPrefix(action, "(up"):
+							words[i-1-j] = strings.ToUpper(words[i-1-j])
+						case strings.HasPrefix(action, "(low"):
+							words[i-1-j] = strings.ToLower(words[i-1-j])
+						case strings.HasPrefix(action, "(cap"):
+							words[i-1-j] = capitalize(words[i-1-j])
+						}
 					}
-				}
 
-				words[i], words[i+1] = "", ""
+					words[i], words[i+1] = "", ""
+				}
 			}
 		}
 
-		line := strings.Join(clean(words), " ")
+		cleaned := clean(words)
+
+		line = strings.Join(cleaned, " ")
 		line = fixPunct(line)
 		line = fixQuotes(line)
 		line = fixArticles(line)
@@ -102,16 +105,16 @@ func process(text string) string {
 
 // ================= HELPERS =================
 
-func toHex(s string) string {
-	var n int
-	fmt.Sscanf(s, "%x", &n)
-	return fmt.Sprintf("%d", n)
-}
+func toBase(s string, base int) string {
+	var n int64
 
-func toBin(s string) string {
-	var n int
-	fmt.Sscanf(s, "%b", &n)
-	return fmt.Sprintf("%d", n)
+	if base == 16 {
+		fmt.Sscanf(s, "%x", &n)
+	} else if base == 2 {
+		fmt.Sscanf(s, "%b", &n)
+	}
+
+	return strconv.FormatInt(n, 10)
 }
 
 func capitalize(s string) string {
@@ -131,64 +134,67 @@ func clean(w []string) []string {
 	return r
 }
 
-// ================= PUNCTUATION (FIXED) =================
+// ================= PUNCTUATION =================
 
 func fixPunct(s string) string {
-	// remove space before punctuation
-	s = strings.ReplaceAll(s, " ,", ",")
-	s = strings.ReplaceAll(s, " .", ".")
-	s = strings.ReplaceAll(s, " !", "!")
-	s = strings.ReplaceAll(s, " ?", "?")
-	s = strings.ReplaceAll(s, " :", ":")
-	s = strings.ReplaceAll(s, " ;", ";")
+	punct := ".,!?:;"
+	var res []rune
 
-	// fix grouped punctuation
-	s = strings.ReplaceAll(s, ". . .", "...")
-	s = strings.ReplaceAll(s, "! ?", "!?")
+	for i := 0; i < len(s); i++ {
+		c := rune(s[i])
 
-	return s
+		if strings.ContainsRune(punct, c) {
+
+			// remove space before punctuation
+			if len(res) > 0 && res[len(res)-1] == ' ' {
+				res = res[:len(res)-1]
+			}
+
+			res = append(res, c)
+
+			// always add space after punctuation (safe rule)
+			res = append(res, ' ')
+			continue
+		}
+
+		res = append(res, c)
+	}
+
+	return strings.TrimSpace(string(res))
 }
 
 // ================= QUOTES =================
 
 func fixQuotes(s string) string {
-	var result []rune
-	inQuote := false
-	spaceBuffer := false
+	var res []rune
+	in := false
 
 	for _, r := range s {
 		if r == '\'' {
-			inQuote = !inQuote
-			result = append(result, r)
+			in = !in
+			res = append(res, r)
 			continue
 		}
 
-		if inQuote {
-			if unicode.IsSpace(r) {
-				spaceBuffer = true
-				continue
-			}
-			if spaceBuffer && len(result) > 0 && result[len(result)-1] != '\'' {
-				result = append(result, ' ')
-			}
-			spaceBuffer = false
+		if in && r == ' ' {
+			continue
 		}
 
-		result = append(result, r)
+		res = append(res, r)
 	}
 
-	return string(result)
+	return string(res)
 }
 
-// ================= ARTICLES (FIXED) =================
+// ================= ARTICLES =================
 
 func fixArticles(s string) string {
 	w := strings.Fields(s)
 
 	for i := 0; i < len(w)-1; i++ {
 		if strings.ToLower(w[i]) == "a" {
-			n := strings.ToLower(w[i+1])
-			if len(n) > 0 && strings.ContainsRune("aeiouh", rune(n[0])) {
+			next := strings.ToLower(w[i+1])
+			if len(next) > 0 && strings.ContainsRune("aeiouh", rune(next[0])) {
 				if w[i] == "A" {
 					w[i] = "An"
 				} else {
