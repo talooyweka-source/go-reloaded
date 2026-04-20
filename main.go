@@ -50,7 +50,7 @@ func process(text string) string {
 				words[i] = ""
 			}
 
-			// CASES
+			// SIMPLE CASES
 			if i > 0 {
 				switch words[i] {
 				case "(up)":
@@ -74,14 +74,14 @@ func process(text string) string {
 				var n int
 				fmt.Sscanf(strings.Trim(words[i+1], ")"), "%d", &n)
 
-				for j := 1; j <= n && i-j >= 0; j++ {
+				for j := 0; j < n && i-1-j >= 0; j++ {
 					switch {
 					case strings.HasPrefix(words[i], "(up"):
-						words[i-j] = strings.ToUpper(words[i-j])
+						words[i-1-j] = strings.ToUpper(words[i-1-j])
 					case strings.HasPrefix(words[i], "(low"):
-						words[i-j] = strings.ToLower(words[i-j])
+						words[i-1-j] = strings.ToLower(words[i-1-j])
 					case strings.HasPrefix(words[i], "(cap"):
-						words[i-j] = capitalize(words[i-j])
+						words[i-1-j] = capitalize(words[i-1-j])
 					}
 				}
 
@@ -131,83 +131,69 @@ func clean(w []string) []string {
 	return r
 }
 
-// ================= PUNCTUATION (FINAL AUDIT SAFE) =================
+// ================= PUNCTUATION (FIXED) =================
 
 func fixPunct(s string) string {
-	punct := ".,!?:;"
+	// remove space before punctuation
+	s = strings.ReplaceAll(s, " ,", ",")
+	s = strings.ReplaceAll(s, " .", ".")
+	s = strings.ReplaceAll(s, " !", "!")
+	s = strings.ReplaceAll(s, " ?", "?")
+	s = strings.ReplaceAll(s, " :", ":")
+	s = strings.ReplaceAll(s, " ;", ";")
 
-	w := strings.Fields(s)
-	var res []string
+	// fix grouped punctuation
+	s = strings.ReplaceAll(s, ". . .", "...")
+	s = strings.ReplaceAll(s, "! ?", "!?")
 
-	for i := 0; i < len(w); i++ {
-
-		if w[i] == "..." || w[i] == "!?" {
-			res = append(res, w[i])
-			continue
-		}
-
-		if len(w[i]) == 1 && strings.ContainsRune(punct, rune(w[i][0])) {
-			if len(res) > 0 {
-				res[len(res)-1] += w[i]
-			}
-			continue
-		}
-
-		last := w[i][len(w[i])-1]
-		if strings.ContainsRune(punct, rune(last)) && len(w[i]) > 1 {
-			res = append(res, w[i][:len(w[i])-1])
-			res = append(res, string(last))
-			continue
-		}
-
-		res = append(res, w[i])
-	}
-
-	var final []string
-	for i := 0; i < len(res); i++ {
-		if i > 0 && len(res[i]) == 1 && strings.ContainsRune(punct, rune(res[i][0])) {
-			final[len(final)-1] += res[i]
-		} else {
-			final = append(final, res[i])
-		}
-	}
-
-	return strings.Join(final, " ")
+	return s
 }
 
-// ================= QUOTES (FINAL SAFE) =================
+// ================= QUOTES =================
 
 func fixQuotes(s string) string {
-	var res []rune
-	in := false
+	var result []rune
+	inQuote := false
+	spaceBuffer := false
 
 	for _, r := range s {
 		if r == '\'' {
-			res = append(res, r)
-			in = !in
+			inQuote = !inQuote
+			result = append(result, r)
 			continue
 		}
 
-		if in && unicode.IsSpace(r) {
-			continue
+		if inQuote {
+			if unicode.IsSpace(r) {
+				spaceBuffer = true
+				continue
+			}
+			if spaceBuffer && len(result) > 0 && result[len(result)-1] != '\'' {
+				result = append(result, ' ')
+			}
+			spaceBuffer = false
 		}
 
-		res = append(res, r)
+		result = append(result, r)
 	}
 
-	return string(res)
+	return string(result)
 }
 
-// ================= ARTICLES (FINAL SAFE) =================
+// ================= ARTICLES (FIXED) =================
 
 func fixArticles(s string) string {
 	w := strings.Fields(s)
 
 	for i := 0; i < len(w)-1; i++ {
-		if w[i] == "a" {
+		if strings.ToLower(w[i]) == "a" {
 			n := strings.ToLower(w[i+1])
 			if len(n) > 0 && strings.ContainsRune("aeiouh", rune(n[0])) {
-				w[i] = "an"
+				if w[i] == "A" {
+					w[i] = "An"
+				} else {
+					w[i] = "an"
+				}
 			}
 		}
 	}
